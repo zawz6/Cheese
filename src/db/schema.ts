@@ -132,6 +132,30 @@ export const entry = pgTable(
   ],
 );
 
+/* ---------- Notes that friends see once they have caught up ---------- */
+
+// A short note on an item, tied to how far the author was when they wrote it. Friends only see the text once
+// their own progress on the same item has reached `position` (or they have finished it).
+export const entryNote = pgTable(
+  "entry_note",
+  {
+    id: id(),
+    entryId: uuid("entry_id").notNull().references(() => entry.id, { onDelete: "cascade" }),
+    userId: userRef("user_id"),
+    itemId: uuid("item_id").notNull().references(() => item.id, { onDelete: "cascade" }),
+    // In the item's own unit (episodes, chapters, pages, minutes). 0 means "no spoilers", 1 on a movie means "after watching".
+    position: integer("position").notNull(),
+    body: text("body").notNull(),
+    createdAt: tz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("entry_note_item_idx").on(t.itemId, t.createdAt),
+    index("entry_note_entry_idx").on(t.entryId),
+    check("entry_note_body", sql`char_length(${t.body}) between 1 and 280`),
+    check("entry_note_position", sql`${t.position} >= 0`),
+  ],
+);
+
 /* ---------- Time actually spent ---------- */
 
 // One row per tap of a progress button. Feeds the weekly goal now and streaks and recaps later.

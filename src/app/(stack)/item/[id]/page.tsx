@@ -7,9 +7,12 @@ import { Icon } from "@/components/icons";
 import { getOwnEntry } from "@/lib/entries";
 import { CATEGORY_LABEL, lengthLine } from "@/lib/length";
 import { friendsWanting, wantingHint } from "@/lib/friends";
+import { friendNotes, myNotes } from "@/lib/notes";
+import { lockedLabel, positionLabel } from "@/lib/notes-rules";
 import { requireUser } from "@/lib/session";
 import { shortDate } from "@/lib/time";
 import { ItemControls, RemoveButton, type ItemState } from "./item-controls";
+import { ItemNotes } from "./item-notes";
 
 export const metadata = { title: "Item" };
 
@@ -21,7 +24,8 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
   if (!row) notFound();
   const { entry: e, item: it } = row;
   const { rate } = await searchParams;
-  const togetherHint = wantingHint(await friendsWanting(user.id, it.id));
+  const [friends, mine, theirs] = await Promise.all([friendsWanting(user.id, it.id), myNotes(user.id, it.id), friendNotes(user.id, it.id)]);
+  const togetherHint = wantingHint(friends);
 
   const state: ItemState = {
     entryId: e.id,
@@ -80,6 +84,25 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
       )}
 
       <ItemControls initial={state} />
+
+      {theirs.length > 0 && (
+        <section className="sec">
+          <p className="ch-overline">Friends&apos; notes</p>
+          <div className="ch-list">
+            {theirs.map((n) => (
+              <div className="ch-lrow" key={n.id} style={{ display: "block" }}>
+                <p className="ch-row-title">
+                  {n.author.displayName}
+                  {!n.locked && positionLabel(it.unit, n.position) && <span className="hint"> · {positionLabel(it.unit, n.position)}</span>}
+                </p>
+                {n.locked ? <p className="hint">🔒 {lockedLabel(it.unit, n.position)}</p> : <p>{n.body}</p>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <ItemNotes entryId={e.id} unit={it.unit} progress={e.progress} notes={mine.map((n) => ({ id: n.id, position: n.position, body: n.body }))} />
       <section>
         <Link className="ch-btn ch-btn--primary ch-btn--block" href={`/plan/book?entry=${e.id}`}>
           Book a time
