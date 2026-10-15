@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { entry, progressLog } from "@/db/schema";
+import { entry, notification, progressLog } from "@/db/schema";
 import { resetDb } from "../helpers";
 import { seedDemo, userIdByName } from "../seed";
 import { signIn } from "./helpers";
@@ -139,4 +139,25 @@ test("a new account sees an invitation, not a blank screen", async ({ page }) =>
   await expect(page.getByText("Nothing here yet. Add the first thing you want to get to.")).toBeVisible();
   await expect(page.getByRole("link", { name: "Add something" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Pick for me" })).toHaveCount(0);
+});
+
+test("the app icon badge follows the unread count and clears once notifications are opened", async ({ page }) => {
+  await page.addInitScript(() => {
+    const calls: string[] = [];
+    (window as unknown as { badgeCalls: string[] }).badgeCalls = calls;
+    Object.assign(navigator, {
+      setAppBadge: async (n: number) => void calls.push(`set:${n}`),
+      clearAppBadge: async () => void calls.push("clear"),
+    });
+  });
+  const { me } = await signedInWithLibrary(page);
+  await db.insert(notification).values([
+    { userId: me, type: "test", title: "One" },
+    { userId: me, type: "test", title: "Two" },
+  ]);
+  await page.goto("/");
+  await expect.poll(() => page.evaluate(() => (window as unknown as { badgeCalls: string[] }).badgeCalls)).toContain("set:2");
+  await page.getByRole("link", { name: /Notifications/ }).click();
+  await expect(page.getByText("Two")).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { badgeCalls: string[] }).badgeCalls)).toContain("clear");
 });

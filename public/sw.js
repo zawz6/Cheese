@@ -9,6 +9,8 @@ self.addEventListener("push", (event) => {
   } catch {
     data = { body: event.data ? event.data.text() : "" };
   }
+  // Flag the app icon while the app is closed. The app sets the real count the next time it opens.
+  if (self.navigator && self.navigator.setAppBadge) self.navigator.setAppBadge().catch(() => {});
   event.waitUntil(
     self.registration.showNotification(data.title || "Cheese", {
       body: data.body || "",
