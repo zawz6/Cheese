@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { chooseStatus, deleteEntry, logProgress, saveEntry } from "@/app/actions/entry";
 import { STATUS_LABEL } from "@/components/badges";
 import { StarRating } from "@/components/star-rating";
+import { useUndo } from "@/components/undo-toast";
 import { PRIORITIES, STATUSES, type Priority, type Status, type Unit } from "@/db/schema";
 import { describeProgress, percent, stepLabel, STEP } from "@/lib/progress";
 
@@ -38,6 +39,11 @@ function useAction() {
 
 export function ItemControls({ initial }: { initial: ItemState }) {
   const [s, setS] = useState(initial);
+  const showUndo = useUndo();
+  // An undo (or a change from another screen) refreshes the page with new numbers; take them in without losing what is being typed.
+  useEffect(() => {
+    setS((p) => (p.status === initial.status && p.progress === initial.progress ? p : { ...p, status: initial.status, progress: initial.progress }));
+  }, [initial.status, initial.progress]);
   const { pending, error, setError, start } = useAction();
   const total = s.totalOverride ?? s.sized.totalUnits;
   const { primary, secondary } = describeProgress(s.sized, s.progress, s.totalOverride);
@@ -66,6 +72,7 @@ export function ItemControls({ initial }: { initial: ItemState }) {
       const r = await logProgress(s.entryId, mode);
       if (!r.ok) return setError(r.error);
       setS((p) => ({ ...p, status: r.status, progress: r.progress, justFinished: r.finishedNow || p.justFinished }));
+      if (!r.finishedNow) showUndo("add" in mode ? `Logged ${stepLabel(s.sized.unit)}` : "Progress updated", s.entryId, r.undo);
     });
   }
 
@@ -76,6 +83,7 @@ export function ItemControls({ initial }: { initial: ItemState }) {
       const r = await chooseStatus(s.entryId, status);
       if (!r.ok) return setError(r.error);
       setS((p) => ({ ...p, status: r.status, progress: r.progress, justFinished: r.finishedNow || (p.justFinished && r.status === "done") }));
+      showUndo(`Marked as ${STATUS_LABEL[status]}`, s.entryId, r.undo);
     });
   }
 

@@ -41,7 +41,25 @@ export async function changeProgress(userId: string, entryId: string, mode: { ad
     }
     return u;
   });
-  return { entry: updated, finishedNow: next.status === "done" && row.entry.status !== "done" };
+  return { entry: updated, before: stateOf(row.entry), finishedNow: next.status === "done" && row.entry.status !== "done" };
+}
+
+/**
+ * Puts an entry back the way it was before a tap or a status change. When `undoTap` is set, the time that tap
+ * recorded is taken back too (as a negative log row), so the weekly goal and recap stay honest.
+ */
+export async function restoreEntry(userId: string, entryId: string, prev: EntryState, undoTap: boolean) {
+  const row = await getOwnEntry(userId, entryId);
+  if (!row) return null;
+  const delta = prev.progress - row.entry.progress;
+  const updated = await db.transaction(async (tx) => {
+    const [u] = await tx.update(entry).set({ ...prev, updatedAt: new Date() }).where(eq(entry.id, entryId)).returning();
+    if (undoTap && delta !== 0) {
+      await tx.insert(progressLog).values({ userId, entryId, deltaUnits: delta, minutes: Math.round((delta * unitSeconds(row.item)) / 60) });
+    }
+    return u;
+  });
+  return { entry: updated };
 }
 
 /** Minutes of progress taps recorded between two moments. Never negative. */
@@ -59,7 +77,7 @@ export async function changeStatus(userId: string, entryId: string, status: Stat
   const total = row.entry.totalOverride ?? row.item.totalUnits;
   const next = withStatus(stateOf(row.entry), total, status);
   const [updated] = await db.update(entry).set({ ...next, updatedAt: new Date() }).where(eq(entry.id, entryId)).returning();
-  return { entry: updated, finishedNow: status === "done" && row.entry.status !== "done" };
+  return { entry: updated, before: stateOf(row.entry), finishedNow: status === "done" && row.entry.status !== "done" };
 }
 
 export type EntryPatch = Partial<{

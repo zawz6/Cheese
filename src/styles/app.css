@@ -128,3 +128,11 @@ input:focus-visible + .adjust-opt { outline: 2px solid var(--focus); outline-off
 
 /* Popular suggestions sit under the person's own list, set apart by a rule so the two never read as one. */
 .popular { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--line); }
+
+/* Short "Undo" toast, above the tab bar */
+.ch-toast-region { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--size-tabbar) + var(--space-4) + env(safe-area-inset-bottom, 0px)); width: 100%; max-width: 520px; padding-inline: var(--space-4); z-index: 20; pointer-events: none; }
+.ch-toast { pointer-events: auto; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); border-radius: var(--radius-pill); background: var(--ink); color: var(--bg); font: 700 14px/20px var(--font-sans); box-shadow: 0 6px 24px rgb(0 0 0 / .25); animation: toast-in .18s ease-out; }
+.ch-toast__undo { min-height: var(--size-tap); padding: 0 var(--space-4); border: 0; border-radius: var(--radius-pill); background: transparent; color: var(--bg); font: 800 14px/20px var(--font-sans); text-decoration: underline; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
+@media (prefers-reduced-motion: reduce) { .ch-toast { animation: none; } }
+@media (min-width: 900px) { .ch-toast-region { bottom: var(--space-6); } }

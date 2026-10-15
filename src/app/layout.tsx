@@ -5,6 +5,7 @@ import "@fontsource-variable/manrope";
 import "../styles/tokens.css";
 import "../styles/components.css";
 import "../styles/app.css";
+import { UndoProvider } from "@/components/undo-toast";
 
 export const metadata: Metadata = {
   title: { default: "Cheese", template: "%s | Cheese" },
@@ -27,7 +28,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <div className="app">{children}</div>
+        <UndoProvider>
+          <div className="app">{children}</div>
+        </UndoProvider>
       </body>
     </html>
   );

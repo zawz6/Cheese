@@ -4,14 +4,32 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { PRIORITIES, STATUSES, type Status } from "@/db/schema";
-import { changeProgress, changeStatus, getOwnEntry, patchEntry, removeEntry } from "@/lib/entries";
+import { changeProgress, changeStatus, getOwnEntry, patchEntry, removeEntry, restoreEntry } from "@/lib/entries";
+import type { EntryState } from "@/lib/progress";
 import { requireUser } from "@/lib/session";
 
 const id = z.uuid();
 
+/** What an entry looked like before a change, with dates as text so it can travel to the browser and back. */
+export type UndoSnapshot = {
+  status: Status;
+  progress: number;
+  startedAt: string | null;
+  finishedAt: string | null;
+  lastProgressAt: string | null;
+  /** True when the change was a progress tap, so undoing it also takes the logged time back. */
+  tap: boolean;
+};
+
 export type EntryResult =
-  | { ok: true; status: Status; progress: number; finishedNow: boolean }
+  | { ok: true; status: Status; progress: number; finishedNow: boolean; undo: UndoSnapshot }
   | { ok: false; error: string };
+
+const iso = (d: Date | null) => (d ? d.toISOString() : null);
+
+function snapshot(before: EntryState, tap: boolean): UndoSnapshot {
+  return { status: before.status, progress: before.progress, startedAt: iso(before.startedAt), finishedAt: iso(before.finishedAt), lastProgressAt: iso(before.lastProgressAt), tap };
+}
 
 function refresh(entryId: string) {
   revalidatePath(`/item/${entryId}`);
@@ -28,7 +46,7 @@ export async function logProgress(entryId: string, mode: { add: number } | { set
   const res = await changeProgress(user.id, parsedId.data, parsedMode.data);
   if (!res) return { ok: false, error: "That item is not in your library." };
   refresh(entryId);
-  return { ok: true, status: res.entry.status, progress: res.entry.progress, finishedNow: res.finishedNow };
+  return { ok: true, status: res.entry.status, progress: res.entry.progress, finishedNow: res.finishedNow, undo: snapshot(res.before, "add" in parsedMode.data) };
 }
 
 export async function chooseStatus(entryId: string, status: string): Promise<EntryResult> {
@@ -39,7 +57,30 @@ export async function chooseStatus(entryId: string, status: string): Promise<Ent
   const res = await changeStatus(user.id, parsedId.data, parsedStatus.data);
   if (!res) return { ok: false, error: "That item is not in your library." };
   refresh(entryId);
-  return { ok: true, status: res.entry.status, progress: res.entry.progress, finishedNow: res.finishedNow };
+  return { ok: true, status: res.entry.status, progress: res.entry.progress, finishedNow: res.finishedNow, undo: snapshot(res.before, false) };
+}
+
+const snapshotSchema = z.object({
+  status: z.enum(STATUSES),
+  progress: z.number().int().min(0).max(1_000_000),
+  startedAt: z.iso.datetime().nullable(),
+  finishedAt: z.iso.datetime().nullable(),
+  lastProgressAt: z.iso.datetime().nullable(),
+  tap: z.boolean(),
+});
+
+/** Reverses the last progress tap or status change, using the snapshot that change handed back. */
+export async function undoEntry(entryId: string, snap: UndoSnapshot): Promise<EntryResult> {
+  const { user } = await requireUser();
+  const parsedId = id.safeParse(entryId);
+  const parsed = snapshotSchema.safeParse(snap);
+  if (!parsedId.success || !parsed.success) return { ok: false, error: "That could not be undone." };
+  const d = (v: string | null) => (v ? new Date(v) : null);
+  const prev: EntryState = { status: parsed.data.status, progress: parsed.data.progress, startedAt: d(parsed.data.startedAt), finishedAt: d(parsed.data.finishedAt), lastProgressAt: d(parsed.data.lastProgressAt) };
+  const res = await restoreEntry(user.id, parsedId.data, prev, parsed.data.tap);
+  if (!res) return { ok: false, error: "That item is not in your library." };
+  refresh(entryId);
+  return { ok: true, status: res.entry.status, progress: res.entry.progress, finishedNow: false, undo: parsed.data };
 }
 
 const patchSchema = z

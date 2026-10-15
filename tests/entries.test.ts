@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { entry } from "@/db/schema";
 import { addEntry, upsertItem } from "@/lib/library";
-import { changeProgress, changeStatus, getOwnEntry, patchEntry, removeEntry } from "@/lib/entries";
+import { changeProgress, changeStatus, getOwnEntry, minutesBetween, patchEntry, removeEntry, restoreEntry } from "@/lib/entries";
 import { describeProgress, percent, withProgress, withStatus, type EntryState } from "@/lib/progress";
 import { makeUser, resetDb } from "./helpers";
 
@@ -141,6 +141,42 @@ describe("entry operations", () => {
     expect((await patchEntry(me.id, e.id, { ratingHalf: 9 }))?.ratingHalf).toBe(9);
     await expect(patchEntry(me.id, e.id, { ratingHalf: 11 })).rejects.toThrow();
     await expect(patchEntry(me.id, e.id, { ratingHalf: 0 })).rejects.toThrow();
+  });
+
+  it("undoing a tap restores the entry and takes the logged time back", async () => {
+    const { me, e } = await setup();
+    const tap = await changeProgress(me.id, e.id, { add: 1 });
+    expect(tap?.entry).toMatchObject({ status: "in_progress", progress: 1 });
+    const undone = await restoreEntry(me.id, e.id, tap!.before, true);
+    expect(undone?.entry).toMatchObject({ status: "want", progress: 0, startedAt: null, lastProgressAt: null });
+    expect(await minutesBetween(me.id, new Date(0), new Date(Date.now() + 60_000))).toBe(0);
+  });
+
+  it("undoing the tap that finished something reopens it", async () => {
+    const { me, e } = await setup(2);
+    await changeProgress(me.id, e.id, { add: 1 });
+    const last = await changeProgress(me.id, e.id, { add: 1 });
+    expect(last?.finishedNow).toBe(true);
+    const undone = await restoreEntry(me.id, e.id, last!.before, true);
+    expect(undone?.entry).toMatchObject({ status: "in_progress", progress: 1, finishedAt: null });
+  });
+
+  it("undoing a status change does not touch the time log", async () => {
+    const { me, e } = await setup();
+    await changeProgress(me.id, e.id, { add: 2 });
+    const before = await minutesBetween(me.id, new Date(0), new Date(Date.now() + 60_000));
+    const changed = await changeStatus(me.id, e.id, "done");
+    const undone = await restoreEntry(me.id, e.id, changed!.before, false);
+    expect(undone?.entry).toMatchObject({ status: "in_progress", progress: 2, finishedAt: null });
+    expect(await minutesBetween(me.id, new Date(0), new Date(Date.now() + 60_000))).toBe(before);
+  });
+
+  it("someone else cannot undo onto your entry", async () => {
+    const { me, e } = await setup();
+    const tap = await changeProgress(me.id, e.id, { add: 1 });
+    const other = await makeUser("Sara");
+    expect(await restoreEntry(other.id, e.id, tap!.before, true)).toBeNull();
+    expect((await getOwnEntry(me.id, e.id))?.entry.progress).toBe(1);
   });
 
   it("removing deletes only that person's entry", async () => {

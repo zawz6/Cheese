@@ -44,6 +44,18 @@ test("tapping +1 ep logs time toward the week and moves to the next episode", as
   expect(logs[0]).toMatchObject({ deltaUnits: 1, minutes: 24 });
 });
 
+test("Undo takes a tap back, including the logged time", async ({ page }) => {
+  const { me } = await signedInWithLibrary(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "+1 ep" }).click();
+  await expect(page.getByText("Anime · Episode 9 · 24 min")).toBeVisible();
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(page.getByText("Anime · Episode 8 · 24 min")).toBeVisible();
+  await expect(page.getByText("0/6h")).toBeVisible();
+  const logs = await db.select().from(progressLog).where(eq(progressLog.userId, me));
+  expect(logs.reduce((n, l) => n + l.minutes, 0)).toBe(0);
+});
+
 test("setting a number by hand does not count as time spent", async ({ page }) => {
   const { me, seeded } = await signedInWithLibrary(page);
   await page.goto(`/item/${seeded["Frieren"].id}`);
