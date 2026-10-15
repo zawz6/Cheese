@@ -3,6 +3,7 @@ import { saveProfile } from "@/app/actions/friends";
 import { ActionForm } from "@/components/form-field";
 import { Icon } from "@/components/icons";
 import { requireUser } from "@/lib/session";
+import { AlertSettings } from "./alert-settings";
 import { ReminderSettings } from "./reminder-settings";
 import { SignOutButton } from "./sign-out";
 
@@ -38,6 +39,11 @@ export default async function SettingsPage() {
       <section className="sec">
         <p className="ch-overline">Reminders</p>
         <ReminderSettings vapidKey={process.env.VAPID_PUBLIC_KEY ?? null} lead={profile.reminderLeadMin} />
+      </section>
+
+      <section className="sec">
+        <p className="ch-overline">Alerts</p>
+        <AlertSettings enabled={profile.alertsEnabled} />
       </section>
 
       <section className="sec">

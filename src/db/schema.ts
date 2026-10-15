@@ -60,6 +60,8 @@ export const profile = pgTable(
     // How long before a session a reminder is sent. 0 turns reminders off.
     reminderLeadMin: smallint("reminder_lead_min").notNull().default(30),
     timezone: text("timezone").notNull().default("UTC"),
+    // Whether to be told when a series, anime or manga they follow grows (new episodes or chapters).
+    alertsEnabled: boolean("alerts_enabled").notNull().default(true),
     icsToken: text("ics_token").notNull().unique(),
     inviteCode: text("invite_code").notNull().unique(),
     createdAt: tz("created_at").notNull().defaultNow(),
@@ -91,6 +93,8 @@ export const item = pgTable(
     genres: text("genres").array().notNull().default(sql`'{}'::text[]`),
     platforms: text("platforms").array().notNull().default(sql`'{}'::text[]`),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    // When the new-content job last asked the source about this item. Null means never.
+    checkedAt: tz("checked_at"),
     createdAt: tz("created_at").notNull().defaultNow(),
   },
   (t) => [

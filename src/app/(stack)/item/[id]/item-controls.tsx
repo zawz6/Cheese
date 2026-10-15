@@ -5,6 +5,7 @@ import { chooseStatus, deleteEntry, logProgress, saveEntry } from "@/app/actions
 import { STATUS_LABEL } from "@/components/badges";
 import { StarRating } from "@/components/star-rating";
 import { PRIORITIES, STATUSES, type Priority, type Status, type Unit } from "@/db/schema";
+import { addedLine } from "@/lib/added-line";
 import { describeProgress, percent, stepLabel, STEP } from "@/lib/progress";
 
 type Sized = { unit: Unit; totalUnits: number | null; unitSeconds: number | null };
@@ -90,6 +91,17 @@ export function ItemControls({ initial }: { initial: ItemState }) {
           </button>
         ))}
       </div>
+
+      {s.status === "done" && total != null && s.progress < total && (
+        <section>
+          <div className="card stack">
+            <p className="ch-heading">{addedLine(s.sized.unit, total - s.progress)} since you finished</p>
+            <button className="ch-btn ch-btn--primary" onClick={() => progressCall({ set: s.progress })} disabled={pending}>
+              Pick up where I left off
+            </button>
+          </div>
+        </section>
+      )}
 
       {needsRating && (
         <section>

@@ -15,3 +15,11 @@ export async function saveTimezone(zone: string) {
   revalidatePath("/", "layout");
   return { ok: true };
 }
+
+export async function saveAlerts(enabled: boolean): Promise<{ ok: boolean }> {
+  const { user } = await requireUser();
+  if (typeof enabled !== "boolean") return { ok: false };
+  await db.update(profile).set({ alertsEnabled: enabled }).where(eq(profile.userId, user.id));
+  revalidatePath("/settings");
+  return { ok: true };
+}

@@ -207,6 +207,6 @@ describe("the cron endpoint", () => {
     await session(u.id, new Date(Date.now() + 10 * 60_000));
     const res = await call({ authorization: "Bearer s3cret-value" });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ due: 1, sent: 1 });
+    expect(await res.json()).toEqual({ due: 1, sent: 1, alerts: { checked: 0, grew: 0, notified: 0 } });
   });
 });
