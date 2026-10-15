@@ -5,12 +5,14 @@ import { Icon } from "@/components/icons";
 import { LogButton } from "@/components/log-button";
 import { NotificationBell } from "@/components/notification-bell";
 import { PopularShelves } from "@/components/popular-shelves";
+import { StaleNudge } from "@/components/stale-nudge";
 import { CATEGORIES, type Category } from "@/db/schema";
 import { CATEGORY_LABEL, CATEGORY_PLURAL } from "@/lib/length";
 import { loadHome } from "@/lib/home";
 import { unreadCount } from "@/lib/notifications";
 import { percent, shortProgress } from "@/lib/progress";
 import { requireUser } from "@/lib/session";
+import { loadStale } from "@/lib/stale";
 import { hoursLabel } from "@/lib/time";
 import { SubmitButton } from "@/components/submit-button";
 
@@ -21,7 +23,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const sp = await searchParams;
   const category = CATEGORIES.includes(sp.category as Category) ? (sp.category as Category) : undefined;
   const home = await loadHome(user.id, profile.timezone, profile.weeklyGoalMinutes, category);
-  const unread = await unreadCount(user.id);
+  const [unread, stale] = await Promise.all([unreadCount(user.id), loadStale(user.id)]);
   const { spotlight: spot, more } = home;
   const tab = (c: Category | undefined) => (c ? `/?category=${c}` : "/");
 
@@ -53,6 +55,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </Link>
         ))}
       </div>
+
+      <StaleNudge entries={stale} />
 
       {!spot ? (
         <section>

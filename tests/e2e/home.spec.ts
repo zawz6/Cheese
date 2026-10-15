@@ -44,6 +44,28 @@ test("tapping +1 ep logs time toward the week and moves to the next episode", as
   expect(logs[0]).toMatchObject({ deltaUnits: 1, minutes: 24 });
 });
 
+test("an item idle for weeks gets a nudge that can pause it, and Not now hides it", async ({ page }) => {
+  const { seeded } = await signedInWithLibrary(page);
+  await db.update(entry).set({ lastProgressAt: new Date(Date.now() - 40 * 86_400_000) }).where(eq(entry.id, seeded["Vinland Saga"].id));
+  await page.goto("/");
+  const nudge = page.getByRole("region", { name: "Still into this?" });
+  await expect(nudge.getByText("Vinland Saga")).toBeVisible();
+  await expect(nudge.getByText("Nothing logged for 40 days.")).toBeVisible();
+
+  await nudge.getByRole("button", { name: "Not now" }).click();
+  await expect(nudge).toBeHidden();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Tonight" })).toBeVisible();
+  await expect(nudge).toBeHidden();
+
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await nudge.getByRole("button", { name: "Pause" }).click();
+  await expect(nudge).toBeHidden();
+  const [row] = await db.select().from(entry).where(eq(entry.id, seeded["Vinland Saga"].id));
+  expect(row.status).toBe("paused");
+});
+
 test("setting a number by hand does not count as time spent", async ({ page }) => {
   const { me, seeded } = await signedInWithLibrary(page);
   await page.goto(`/item/${seeded["Frieren"].id}`);
