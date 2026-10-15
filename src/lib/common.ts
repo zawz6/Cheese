@@ -85,7 +85,7 @@ export async function loadGroupView(viewerId: string, groupId: string, filters: 
       return m != null && m <= (filters.underMinutes as number);
     });
   }
-  if (filters.samePlatform) rows = rows.filter((r) => r.item.category !== "game" || samePlatform(platformsByItem.get(r.item.id) ?? []));
+  if (filters.samePlatform) rows = rows.filter((r) => samePlatform(platformsByItem.get(r.item.id) ?? []));
 
   return { group, match, totalCommon, rows };
 }

@@ -1,14 +1,17 @@
+import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { CategoryTag, StatusBadge } from "@/components/badges";
 import { Cover } from "@/components/cover";
 import { Icon } from "@/components/icons";
+import { WhereToWatch } from "@/components/where-to-watch";
 import { getOwnEntry } from "@/lib/entries";
 import { CATEGORY_LABEL, lengthLine } from "@/lib/length";
 import { friendsWanting, wantingHint } from "@/lib/friends";
 import { requireUser } from "@/lib/session";
 import { shortDate } from "@/lib/time";
+import { regionFromAcceptLanguage, whereToWatch } from "@/lib/watch";
 import { ItemControls, RemoveButton, type ItemState } from "./item-controls";
 
 export const metadata = { title: "Item" };
@@ -21,7 +24,9 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
   if (!row) notFound();
   const { entry: e, item: it } = row;
   const { rate } = await searchParams;
-  const togetherHint = wantingHint(await friendsWanting(user.id, it.id));
+  const [friends, region] = await Promise.all([friendsWanting(user.id, it.id), headers().then((h) => regionFromAcceptLanguage(h.get("accept-language")))]);
+  const togetherHint = wantingHint(friends);
+  const watch = await whereToWatch(it, region);
 
   const state: ItemState = {
     entryId: e.id,
@@ -78,6 +83,8 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
           <p className="hint">{it.summary}</p>
         </section>
       )}
+
+      {watch && <WhereToWatch entryId={e.id} region={watch.region} streaming={watch.streaming} link={watch.link} platform={e.platform ?? ""} />}
 
       <ItemControls initial={state} />
       <section>

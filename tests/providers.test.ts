@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchDetails, rank, searchAll } from "@/lib/providers";
-import { tmdb } from "@/lib/providers/tmdb";
+import { tmdb, watchProviders } from "@/lib/providers/tmdb";
+import { regionFromAcceptLanguage, whereToWatch } from "@/lib/watch";
 import { anilist } from "@/lib/providers/anilist";
 import { books, mergeBookHits } from "@/lib/providers/books";
 import { igdb, resetIgdbToken } from "@/lib/providers/igdb";
@@ -114,6 +115,47 @@ describe("TMDB", () => {
     vi.stubEnv("TMDB_API_KEY", "k");
     mockFetch({ "/movie/1": () => ({ id: 1, title: "X" }) });
     await expect(fetchDetails({ source: "tmdb", externalId: "movie/1", category: "series" })).rejects.toThrow(/category mismatch/);
+  });
+});
+
+describe("TMDB watch providers", () => {
+  const body = { results: { US: { link: "https://tmdb/us", flatrate: [{ provider_name: "Netflix" }, { provider_name: "Max" }, { provider_name: "Netflix" }], rent: [{ provider_name: "Apple TV" }] }, GB: { link: "https://tmdb/gb", rent: [{ provider_name: "Apple TV" }] } } };
+
+  it("lists only subscription services for the region, without repeats", async () => {
+    vi.stubEnv("TMDB_API_KEY", "abc123");
+    mockFetch({ "/movie/157336/watch/providers": () => body });
+    expect(await watchProviders("movie/157336", "US", signal())).toEqual({ region: "US", streaming: ["Netflix", "Max"], link: "https://tmdb/us" });
+    expect(calls[0].url).toContain("api_key=abc123");
+  });
+
+  it("returns null when the region has no subscription service or no data", async () => {
+    vi.stubEnv("TMDB_API_KEY", "abc123");
+    mockFetch({ "/tv/1/watch/providers": () => body });
+    expect(await watchProviders("tv/1", "GB", signal())).toBeNull();
+    expect(await watchProviders("tv/1", "FR", signal())).toBeNull();
+  });
+
+  it("refuses ids and regions that are not what TMDB expects, without calling out", async () => {
+    vi.stubEnv("TMDB_API_KEY", "abc123");
+    mockFetch({});
+    expect(await watchProviders("OL123W", "US", signal())).toBeNull();
+    expect(await watchProviders("movie/1", "us/../x", signal())).toBeNull();
+    expect(calls).toHaveLength(0);
+  });
+
+  it("whereToWatch only asks for TMDB titles, and swallows provider errors", async () => {
+    vi.stubEnv("TMDB_API_KEY", "abc123");
+    mockFetch({ "/watch/providers": () => new Response("down", { status: 500 }) });
+    expect(await whereToWatch({ source: "igdb", externalId: "5" }, "US")).toBeNull();
+    expect(await whereToWatch({ source: "tmdb", externalId: null }, "US")).toBeNull();
+    expect(await whereToWatch({ source: "tmdb", externalId: "movie/9" }, "US")).toBeNull();
+  });
+
+  it("picks the region from the browser language", () => {
+    expect(regionFromAcceptLanguage("en-GB,en;q=0.9")).toBe("GB");
+    expect(regionFromAcceptLanguage("fr-ca;q=0.8, fr;q=0.5")).toBe("CA");
+    expect(regionFromAcceptLanguage("en")).toBe("US");
+    expect(regionFromAcceptLanguage(null)).toBe("US");
   });
 });
 

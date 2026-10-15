@@ -185,3 +185,28 @@ test.describe("library", () => {
     await ctx.close();
   });
 });
+
+test("a movie shows where it streams, and tapping a service sets your platform", async ({ page }) => {
+  await signIn(page, "Yousef");
+  await addFromSearch(page, "interstellar", "Add Interstellar (Movie)");
+  await page.getByRole("link", { name: /^Open Interstellar/ }).click();
+
+  await expect(page.getByText("Streaming in US")).toBeVisible();
+  const netflix = page.getByRole("button", { name: "Netflix" });
+  await expect(page.getByRole("button", { name: "Max" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Apple TV" })).toHaveCount(0); // rent-only is not a subscription
+  await netflix.click();
+  await expect(netflix).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(async () => (await ownEntry("Interstellar")).platform).toBe("Netflix");
+
+  await netflix.click();
+  await expect.poll(async () => (await ownEntry("Interstellar")).platform).toBeNull();
+});
+
+test("a book has no streaming section", async ({ page }) => {
+  await signIn(page, "Yousef");
+  await addFromSearch(page, "dune", "Add Dune (Book)");
+  await page.getByRole("link", { name: /^Open Dune/ }).first().click();
+  await expect(page.getByRole("heading", { name: "Dune" })).toBeVisible();
+  await expect(page.getByText(/Streaming in/)).toHaveCount(0);
+});

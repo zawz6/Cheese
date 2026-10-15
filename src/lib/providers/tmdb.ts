@@ -132,3 +132,25 @@ export const tmdb: Provider = {
     return m[1] === "movie" ? movieDraft(data) : tvDraft(data);
   },
 };
+
+export type WatchProviders = {
+  region: string;
+  /** Subscription services that stream it in this region, as TMDB names them. */
+  streaming: string[];
+  /** TMDB's page for the title in this region (which carries the JustWatch credit). */
+  link: string | null;
+};
+
+type WatchResp = { results?: Record<string, { link?: string; flatrate?: { provider_name: string }[] }> };
+
+/** Where a movie or series streams in a region. Null when TMDB has nothing for that region. Cached for a day. */
+export async function watchProviders(externalId: string, region: string, signal: AbortSignal): Promise<WatchProviders | null> {
+  const m = externalId.match(/^(movie|tv)\/(\d+)$/);
+  if (!m || !/^[A-Z]{2}$/.test(region)) return null;
+  const a = auth();
+  const url = `${BASE}/${m[1]}/${m[2]}/watch/providers?${a.query.slice(1)}`;
+  const data = await fetchJson<WatchResp>("TMDB", url, { headers: a.headers }, signal, { cacheMs: 24 * 3600_000 });
+  const here = data.results?.[region];
+  const streaming = [...new Set((here?.flatrate ?? []).map((p) => p.provider_name))];
+  return streaming.length ? { region, streaming, link: here?.link ?? null } : null;
+}

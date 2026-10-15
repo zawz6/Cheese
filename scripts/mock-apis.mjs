@@ -52,6 +52,8 @@ const anilistMedia = (e, type) => {
 
 const routes = [
   [/api\.themoviedb\.org\/3\/search\/multi\?query=([^&]*)/, (m) => json(tmdbSearch(decodeURIComponent(m[1])))],
+  [/api\.themoviedb\.org\/3\/(movie|tv)\/(\d+)\/watch\/providers/, (m) => json({ id: Number(m[2]), results: { US: { link: `https://www.themoviedb.org/${m[1]}/${m[2]}/watch?locale=US`, flatrate: [{ provider_name: "Netflix" }, { provider_name: "Max" }], rent: [{ provider_name: "Apple TV" }] }, GB: { link: "https://www.themoviedb.org", rent: [{ provider_name: "Apple TV" }] } } })],
+  [/api\.themoviedb\.org\/3\/(movie|tv)\/(\d+)\/watch\/providers/, (m) => json({ id: Number(m[2]), results: { US: { link: `https://www.themoviedb.org/${m[1]}/${m[2]}/watch?locale=US`, flatrate: [{ provider_name: "Netflix" }, { provider_name: "Max" }], rent: [{ provider_name: "Apple TV" }] }, GB: { link: "https://www.themoviedb.org", rent: [{ provider_name: "Apple TV" }] } } })],
   [/api\.themoviedb\.org\/3\/movie\/(\d+)/, (m) => {
     const e = CATALOG.find((c) => c.movie?.id === Number(m[1]));
     return e ? json({ id: e.movie.id, title: e.title, release_date: e.movie.year, runtime: e.movie.runtime, overview: `${e.title} (sample data).`, genres: [{ name: "Drama" }], credits: { crew: [{ job: "Director", name: e.movie.director }] } }) : json({}, 404);
