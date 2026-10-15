@@ -4,6 +4,7 @@ import { ActionForm } from "@/components/form-field";
 import { Icon } from "@/components/icons";
 import { requireUser } from "@/lib/session";
 import { ReminderSettings } from "./reminder-settings";
+import { DeleteAccount } from "./delete-account";
 import { SignOutButton } from "./sign-out";
 
 export const metadata = { title: "Settings" };
@@ -49,6 +50,11 @@ export default async function SettingsPage() {
 
       <section>
         <SignOutButton />
+      </section>
+
+      <section className="sec">
+        <p className="ch-overline">Account</p>
+        <DeleteAccount username={profile.username} />
       </section>
     </>
   );

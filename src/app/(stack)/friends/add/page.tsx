@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { requestFriend } from "@/app/actions/friends";
+import { newInviteLink } from "@/app/actions/profile";
+import { ConfirmAction } from "@/components/confirm-action";
 import { ActionForm } from "@/components/form-field";
 import { Icon } from "@/components/icons";
 import { ShareInvite } from "@/components/share-invite";
@@ -26,6 +28,8 @@ export default async function AddFriendPage() {
         <p className="ch-overline">Send your invite link</p>
         <p className="hint">Anyone who opens it can add you as a friend. Send it in your group chat.</p>
         <ShareInvite url={url} message={`Join me on Cheese, so we can see what we both want to watch, read and play.`} />
+        <p className="hint">Shared it somewhere you should not have? Make a new one. The old link stops working, and your friends stay.</p>
+        <ConfirmAction action={newInviteLink} label="Make a new invite link" confirmLabel="Yes, replace the link" keepLabel="Keep this one" danger={false} />
       </section>
 
       <section className="sec">

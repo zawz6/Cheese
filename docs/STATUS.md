@@ -29,7 +29,5 @@ Streaks, weekly recap, stats and year in review, estimated finish dates, swipe-t
 
 - No rate limiting. Fine for a group of friends, worth adding before opening it to the public.
 - No sign-in by email. Google only (email and password exists for local development and is switched off in production).
-- No way to delete an account from the app yet.
-- A friend's invite link works until you stop using it, there is no "make a new invite link" button yet.
 - Taste match is a simple measure: how much two wish lists overlap, blended with how alike two people rate the same things. It shows "Not enough to compare yet" when there is no data, and does not guess.
 - Book length is estimated at 90 seconds a page and manga at 8 minutes a chapter when a source gives no timing. Anywhere an estimate is shown, it says "about".
