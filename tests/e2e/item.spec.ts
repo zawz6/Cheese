@@ -1,8 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { entry, item, user } from "@/db/schema";
+import { entry, item, progressLog, user } from "@/db/schema";
 import { resetDb } from "../helpers";
+import { seedDemo, userIdByName } from "../seed";
 import { signIn } from "./helpers";
 
 test.beforeEach(async () => {
@@ -184,4 +185,24 @@ test.describe("library", () => {
     await expect(p.getByRole("link", { name: "Add something" })).toBeVisible();
     await ctx.close();
   });
+});
+
+test("an in-progress item shows a finish estimate once there is a pace, and not before", async ({ page }) => {
+  await signIn(page, "Yousef");
+  const me = await userIdByName("Yousef");
+  const seeded = await seedDemo(me);
+  const frieren = seeded["Frieren"];
+  await page.goto(`/item/${frieren.id}`);
+  await expect(page.getByRole("heading", { name: "Frieren" })).toBeVisible();
+  await expect(page.getByText(/At your pace/)).toHaveCount(0);
+
+  for (const d of [12, 9, 6, 3, 1]) {
+    await db.insert(progressLog).values({ userId: me, entryId: frieren.id, at: new Date(Date.now() - d * 86_400_000), deltaUnits: 1, minutes: 24 });
+  }
+  await page.reload();
+  await expect(page.getByText(/At your pace you would finish around \d+ \w+/)).toBeVisible();
+
+  await page.goto(`/item/${seeded["Spirited Away"].id}`);
+  await expect(page.getByRole("heading", { name: "Spirited Away" })).toBeVisible();
+  await expect(page.getByText(/At your pace/)).toHaveCount(0);
 });

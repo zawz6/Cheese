@@ -5,6 +5,7 @@ import { CategoryTag, StatusBadge } from "@/components/badges";
 import { Cover } from "@/components/cover";
 import { Icon } from "@/components/icons";
 import { getOwnEntry } from "@/lib/entries";
+import { finishLabel, loadFinishEstimate } from "@/lib/estimate";
 import { CATEGORY_LABEL, lengthLine } from "@/lib/length";
 import { friendsWanting, wantingHint } from "@/lib/friends";
 import { requireUser } from "@/lib/session";
@@ -43,6 +44,7 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
     togetherHint,
   };
   const length = lengthLine(it, e.totalOverride);
+  const estimate = e.status === "in_progress" ? await loadFinishEstimate(user.id, e.id, e.progress, e.totalOverride ?? it.totalUnits, profile.timezone) : null;
   const sub = [it.year, it.creator].filter(Boolean).join(" · ");
 
   return (
@@ -69,6 +71,7 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
           <div className="row">
             <StatusBadge status={e.status} />
           </div>
+          {estimate && <span className="ch-caption">At your pace you would finish {finishLabel(estimate, profile.timezone)}</span>}
           {e.status === "done" && e.finishedAt && <span className="ch-caption">Finished {shortDate(e.finishedAt, profile.timezone)}</span>}
         </div>
       </section>
