@@ -132,6 +132,25 @@ export const entry = pgTable(
   ],
 );
 
+// An earlier, finished run of the same item. Starting something again after finishing it files the old run here
+// before progress goes back to zero, so rewatches and rereads keep their dates, rating and review.
+export const entryRun = pgTable(
+  "entry_run",
+  {
+    id: id(),
+    entryId: uuid("entry_id").notNull().references(() => entry.id, { onDelete: "cascade" }),
+    startedAt: tz("started_at"),
+    finishedAt: tz("finished_at").notNull(),
+    ratingHalf: smallint("rating_half"),
+    review: text("review"),
+    createdAt: tz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("entry_run_entry_idx").on(t.entryId, t.finishedAt),
+    check("entry_run_rating_range", sql`${t.ratingHalf} is null or ${t.ratingHalf} between 1 and 10`),
+  ],
+);
+
 /* ---------- Time actually spent ---------- */
 
 // One row per tap of a progress button. Feeds the weekly goal now and streaks and recaps later.

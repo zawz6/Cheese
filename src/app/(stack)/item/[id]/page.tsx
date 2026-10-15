@@ -4,7 +4,7 @@ import { z } from "zod";
 import { CategoryTag, StatusBadge } from "@/components/badges";
 import { Cover } from "@/components/cover";
 import { Icon } from "@/components/icons";
-import { getOwnEntry } from "@/lib/entries";
+import { getOwnEntry, listRuns } from "@/lib/entries";
 import { CATEGORY_LABEL, lengthLine } from "@/lib/length";
 import { friendsWanting, wantingHint } from "@/lib/friends";
 import { requireUser } from "@/lib/session";
@@ -21,7 +21,8 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
   if (!row) notFound();
   const { entry: e, item: it } = row;
   const { rate } = await searchParams;
-  const togetherHint = wantingHint(await friendsWanting(user.id, it.id));
+  const [friends, runs] = await Promise.all([friendsWanting(user.id, it.id), listRuns(user.id, e.id)]);
+  const togetherHint = wantingHint(friends);
 
   const state: ItemState = {
     entryId: e.id,
@@ -69,6 +70,7 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
           <div className="row">
             <StatusBadge status={e.status} />
           </div>
+          {runs.length > 0 && <span className="ch-caption">Run {runs.length + 1}</span>}
           {e.status === "done" && e.finishedAt && <span className="ch-caption">Finished {shortDate(e.finishedAt, profile.timezone)}</span>}
         </div>
       </section>
@@ -80,6 +82,28 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
       )}
 
       <ItemControls initial={state} />
+      {runs.length > 0 && (
+        <section className="sec">
+          <p className="ch-overline">Earlier runs</p>
+          <div className="ch-list ch-list--card">
+            {runs.map((r, i) => (
+              <div className="ch-lrow" key={r.id} style={{ display: "block" }}>
+                <p className="ch-row-title">
+                  Run {i + 1}
+                  <span className="hint">
+                    {" · "}
+                    {r.startedAt ? `${shortDate(r.startedAt, profile.timezone)} to ` : "Finished "}
+                    {shortDate(r.finishedAt, profile.timezone)}
+                    {r.ratingHalf != null && ` · ${(r.ratingHalf / 2).toFixed(1)} stars`}
+                  </span>
+                </p>
+                {r.review && <p className="hint">{r.review}</p>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section>
         <Link className="ch-btn ch-btn--primary ch-btn--block" href={`/plan/book?entry=${e.id}`}>
           Book a time

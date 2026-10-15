@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { entry, item, user } from "@/db/schema";
 import { resetDb } from "../helpers";
+import { seedDemo, userIdByName } from "../seed";
 import { signIn } from "./helpers";
 
 test.beforeEach(async () => {
@@ -184,4 +185,22 @@ test.describe("library", () => {
     await expect(p.getByRole("link", { name: "Add something" })).toBeVisible();
     await ctx.close();
   });
+});
+
+test("starting a finished movie again keeps the first run on the page", async ({ page }) => {
+  await signIn(page, "Yousef");
+  const me = await userIdByName("Yousef");
+  const seeded = await seedDemo(me);
+  const movie = seeded["Spirited Away"]; // done, rated 5 stars
+  await page.goto(`/item/${movie.id}`);
+  await expect(page.getByText("Earlier runs")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "In progress" }).click();
+  await expect(page.getByText("Run 2")).toBeVisible();
+  await expect(page.getByText("Earlier runs")).toBeVisible();
+  await expect(page.getByText(/Run 1/)).toBeVisible();
+  await expect(page.getByText(/5\.0 stars/)).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByText("Run 2")).toBeVisible();
 });

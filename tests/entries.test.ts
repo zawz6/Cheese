@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { entry } from "@/db/schema";
 import { addEntry, upsertItem } from "@/lib/library";
-import { changeProgress, changeStatus, getOwnEntry, patchEntry, removeEntry } from "@/lib/entries";
+import { changeProgress, changeStatus, getOwnEntry, listRuns, patchEntry, removeEntry } from "@/lib/entries";
 import { describeProgress, percent, withProgress, withStatus, type EntryState } from "@/lib/progress";
 import { makeUser, resetDb } from "./helpers";
 
@@ -141,6 +141,59 @@ describe("entry operations", () => {
     expect((await patchEntry(me.id, e.id, { ratingHalf: 9 }))?.ratingHalf).toBe(9);
     await expect(patchEntry(me.id, e.id, { ratingHalf: 11 })).rejects.toThrow();
     await expect(patchEntry(me.id, e.id, { ratingHalf: 0 })).rejects.toThrow();
+  });
+
+  describe("starting again after finishing", () => {
+    async function finished() {
+      const { me, e } = await setup(12);
+      await changeProgress(me.id, e.id, { add: 5 });
+      await changeProgress(me.id, e.id, { set: 12 });
+      await patchEntry(me.id, e.id, { ratingHalf: 9, review: "Loved it" });
+      return { me, e };
+    }
+
+    it("files the finished run, keeps the rating, and starts counting from zero", async () => {
+      const { me, e } = await finished();
+      const before = (await getOwnEntry(me.id, e.id))!.entry;
+      const res = await changeStatus(me.id, e.id, "in_progress");
+      expect(res?.entry).toMatchObject({ status: "in_progress", progress: 0, finishedAt: null, ratingHalf: 9, review: "Loved it" });
+      const runs = await listRuns(me.id, e.id);
+      expect(runs).toHaveLength(1);
+      expect(runs[0]).toMatchObject({ ratingHalf: 9, review: "Loved it" });
+      expect(runs[0].finishedAt.getTime()).toBe(before.finishedAt!.getTime());
+      expect(runs[0].startedAt?.getTime()).toBe(before.startedAt!.getTime());
+    });
+
+    it("keeps one run per restart, oldest first", async () => {
+      const { me, e } = await finished();
+      await changeStatus(me.id, e.id, "in_progress");
+      await changeProgress(me.id, e.id, { set: 12 });
+      await patchEntry(me.id, e.id, { ratingHalf: 5 });
+      await changeStatus(me.id, e.id, "in_progress");
+      const runs = await listRuns(me.id, e.id);
+      expect(runs.map((r) => r.ratingHalf)).toEqual([9, 5]);
+    });
+
+    it("does not file a run for anything but a restart after finishing", async () => {
+      const { me, e } = await setup(12);
+      await changeStatus(me.id, e.id, "in_progress");
+      await changeStatus(me.id, e.id, "paused");
+      await changeStatus(me.id, e.id, "in_progress");
+      expect(await listRuns(me.id, e.id)).toEqual([]);
+      // Stepping back from Done is a correction, not a rewatch.
+      await changeProgress(me.id, e.id, { set: 12 });
+      await changeProgress(me.id, e.id, { add: -1 });
+      expect(await listRuns(me.id, e.id)).toEqual([]);
+    });
+
+    it("runs are private to their owner and go with the entry", async () => {
+      const { me, e } = await finished();
+      await changeStatus(me.id, e.id, "in_progress");
+      const other = await makeUser("Sara");
+      expect(await listRuns(other.id, e.id)).toEqual([]);
+      await removeEntry(me.id, e.id);
+      expect(await db.query.entryRun.findMany()).toEqual([]);
+    });
   });
 
   it("removing deletes only that person's entry", async () => {
