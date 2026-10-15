@@ -132,6 +132,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               Pick for me
             </Link>
           </div>
+          <p style={{ marginTop: "var(--space-2)" }}>
+            <Link className="ch-btn ch-btn--pill" href="/stats">
+              Your year in numbers
+            </Link>
+          </p>
         </section>
       )}
 

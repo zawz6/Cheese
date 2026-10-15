@@ -41,6 +41,13 @@ export default async function SettingsPage() {
       </section>
 
       <section className="sec">
+        <p className="ch-overline">Look back</p>
+        <Link className="ch-btn ch-btn--ghost ch-btn--block" href="/stats">
+          Your year in numbers
+        </Link>
+      </section>
+
+      <section className="sec">
         <p className="ch-overline">Time</p>
         <Link className="ch-btn ch-btn--ghost ch-btn--block" href="/plan/setup">
           Free time, weekly goal and calendar
