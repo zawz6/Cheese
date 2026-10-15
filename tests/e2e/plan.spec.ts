@@ -241,3 +241,27 @@ test("booking with a malformed item id says it is not in the library instead of 
   await page.goto("/plan/book?entry=not-a-uuid");
   await expect(page.getByText("That item is not in your library.")).toBeVisible();
 });
+
+test("a missed session can be moved to the next free slot, or dropped", async ({ page }) => {
+  const { me } = await start(page);
+  // Free all day every day, so a slot exists whatever time the test runs.
+  await db.delete(freeWindow).where(eq(freeWindow.userId, me));
+  await db.insert(freeWindow).values(Array.from({ length: 7 }, (_, weekday) => ({ userId: me, weekday, startMin: 0, endMin: 1440 })));
+  const [missed] = await db.insert(planSession).values({ userId: me, title: "Frieren · night watch", startsAt: new Date(Date.now() - 3 * 86_400_000), durationMin: 60 }).returning();
+  const [dropped] = await db.insert(planSession).values({ userId: me, title: "Old reading hour", startsAt: new Date(Date.now() - 2 * 86_400_000), durationMin: 45 }).returning();
+
+  await page.goto("/plan");
+  const card = page.getByRole("region", { name: "Missed sessions" });
+  await expect(card.getByText("Frieren · night watch")).toBeVisible();
+
+  await card.locator(".card", { hasText: "Old reading hour" }).getByRole("button", { name: "Drop it" }).click();
+  await expect(card.getByText("Old reading hour")).toHaveCount(0);
+  expect(await db.select().from(planSession).where(eq(planSession.id, dropped.id))).toHaveLength(0);
+
+  await card.getByRole("button", { name: "Move to next free slot" }).click();
+  await expect(page).toHaveURL(/\/plan\?day=\d{4}-\d{2}-\d{2}/);
+  await expect(page.getByRole("region", { name: "Missed sessions" })).toHaveCount(0);
+  const [row] = await db.select().from(planSession).where(eq(planSession.id, missed.id));
+  expect(row.startsAt.getTime()).toBeGreaterThan(Date.now());
+  expect(row.startsAt.getTime()).toBeLessThan(Date.now() + 2 * 86_400_000);
+});

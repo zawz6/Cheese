@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { entry, freeOverride, freeWindow, item, profile, type Category } from "@/db/schema";
 import { isDay, mergeIntervals, parseClock, parseLocal } from "@/lib/freetime";
 import { disconnectCalendar } from "@/lib/google-calendar";
+import { moveMissed } from "@/lib/missed";
 import { bookSession, completeSession, removeSession } from "@/lib/sessions";
 import { requireUser } from "@/lib/session";
 import { randomToken } from "@/lib/tokens";
@@ -130,4 +131,23 @@ export async function disconnectGoogleCalendar() {
   await disconnectCalendar(user.id);
   revalidatePath("/plan");
   revalidatePath("/plan/setup");
+}
+
+/** Moves a missed session to the first free slot that fits. Only ever runs when the person taps it. */
+export async function rescheduleMissed(id: string, _prev: { error?: string } | undefined): Promise<{ error?: string }> {
+  const { user, profile: me } = await requireUser();
+  if (!z.uuid().safeParse(id).success) return { error: "That session cannot be moved." };
+  const res = await moveMissed(user.id, id, me.timezone);
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/plan");
+  revalidatePath("/");
+  redirect(`/plan?day=${res.day}`);
+}
+
+/** Removes a missed session from the list without changing the page the person is on. */
+export async function dropMissed(id: string) {
+  const { user } = await requireUser();
+  if (z.uuid().safeParse(id).success) await removeSession(user.id, id);
+  revalidatePath("/plan");
+  revalidatePath("/");
 }

@@ -4,10 +4,12 @@ import { removeOverride } from "@/app/actions/plan";
 import { Icon } from "@/components/icons";
 import { CATEGORY_LABEL, formatMinutes } from "@/lib/length";
 import { clockOf, isDay, todayIn } from "@/lib/freetime";
+import { loadMissed } from "@/lib/missed";
 import { loadPlan } from "@/lib/plan";
 import { requireUser } from "@/lib/session";
-import { clock24, dayLabel } from "@/lib/time";
+import { clock24, dayLabel, relativeDay, timeLabel } from "@/lib/time";
 import { AdjustForm } from "./adjust-form";
+import { MissedCard } from "./missed-card";
 
 export const metadata = { title: "Plan" };
 
@@ -17,7 +19,7 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
   const zone = profile.timezone;
   const now = new Date();
   const selected = isDay(sp.day) ? sp.day : todayIn(zone, now);
-  const plan = await loadPlan(user.id, profile, selected, now);
+  const [plan, missed] = await Promise.all([loadPlan(user.id, profile, selected, now), loadMissed(user.id, now)]);
 
   const left = Math.max(0, plan.goalMinutes - plan.spentMinutes);
   const asDate = (day: string) => DateTime.fromISO(day, { zone }).toJSDate();
@@ -51,6 +53,16 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
           </Link>
         ))}
       </nav>
+
+      {missed.length > 0 && (
+        <section className="sec" aria-label="Missed sessions">
+          <p className="ch-overline">Missed</p>
+          {missed.slice(0, 3).map((m) => (
+            <MissedCard key={m.id} id={m.id} title={m.title} when={`${relativeDay(m.startsAt, now, zone)} ${timeLabel(m.startsAt, zone)}`} length={formatMinutes(m.durationMin)} />
+          ))}
+          {missed.length > 3 && <p className="hint">{missed.length - 3} more after these.</p>}
+        </section>
+      )}
 
       <section className="sec">
         <p className="ch-overline">{dayLabel(asDate(plan.selected), zone)}</p>
