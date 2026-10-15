@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { entry, progressLog } from "@/db/schema";
+import { entry, freeWindow, progressLog } from "@/db/schema";
 import { resetDb } from "../helpers";
 import { seedDemo, userIdByName } from "../seed";
 import { signIn } from "./helpers";
@@ -139,4 +139,32 @@ test("a new account sees an invitation, not a blank screen", async ({ page }) =>
   await expect(page.getByText("Nothing here yet. Add the first thing you want to get to.")).toBeVisible();
   await expect(page.getByRole("link", { name: "Add something" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Pick for me" })).toHaveCount(0);
+});
+
+test("a new account gets a getting-started checklist that tracks real progress and can be dismissed", async ({ page }) => {
+  await signIn(page, "Newcomer");
+  await page.goto("/");
+  const list = page.getByRole("region", { name: "Getting started" });
+  await expect(list.getByText("0 of 3 added")).toBeVisible();
+  await expect(list.getByText("Also set your weekly goal there")).toBeVisible();
+
+  await list.getByRole("button", { name: "Dismiss" }).click();
+  await expect(list).toBeHidden();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Tonight" })).toBeVisible();
+  await expect(list).toBeHidden();
+});
+
+test("the checklist ticks off steps and disappears when both are done", async ({ page }) => {
+  const { me } = await signedInWithLibrary(page); // 12 things in the library, no free time yet
+  await page.goto("/");
+  const list = page.getByRole("region", { name: "Getting started" });
+  await expect(list.getByText("Add 3 things you want to get to")).toBeVisible();
+  await expect(list.getByRole("link", { name: /Add 3 things.*Done/ })).toBeVisible();
+  await expect(list.getByRole("link", { name: /usually free\. Also set/ })).toBeVisible();
+
+  await db.insert(freeWindow).values({ userId: me, weekday: 1, startMin: 1200, endMin: 1320 });
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Tonight" })).toBeVisible();
+  await expect(list).toHaveCount(0);
 });
